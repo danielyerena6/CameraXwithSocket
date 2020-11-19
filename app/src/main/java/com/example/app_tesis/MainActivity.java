@@ -13,6 +13,8 @@ import androidx.core.content.ContextCompat;
 
 import android.content.pm.PackageManager;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Environment;
 import android.os.StrictMode;
 import android.view.Surface;
@@ -35,6 +37,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.lang.String;
 
@@ -42,7 +45,10 @@ import java.lang.String;
 
 import java.io.*;
 
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.SocketChannel;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -71,9 +77,7 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS);
         }
         
-        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
-                .permitNetwork().build());
-        ejecutaCliente();
+
     }
 
     private void startCamera() {
@@ -119,6 +123,9 @@ public class MainActivity extends AppCompatActivity {
                     public void onImageSaved(@NonNull File file) {
                         String msg = "Pic save in "+ file.getAbsolutePath();
                         Toast.makeText(getBaseContext(),msg,Toast.LENGTH_LONG).show();
+                        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
+                                .permitNetwork().build());
+                        ejecutaCliente();
                     }
 
                     @Override
@@ -198,31 +205,42 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             }
         }
-
-        return true;
-    }
-
+        return true;    }
     private void ejecutaCliente(){
+
+        DataInputStream input;
+        BufferedInputStream bis;
+        BufferedOutputStream bos;
+        int in;
+        byte[] byteArray;
+        //Fichero a transferir
+        final String filename = "/storage/emulated/0/hola.dng";
+
+
         String ip = "192.168.1.88";
         int puerto = 5000;
         log(" socket " + ip + " " + puerto);
         try{
-            Socket clientSocket = new Socket(ip,puerto);
 
-            OutputStream outputStream = clientSocket.getOutputStream();
+            SocketChannel socketChannel = SocketChannel.open();
+            SocketAddress socketAddress = new InetSocketAddress("192.168.1.88", 5000);
+            socketChannel.bind(socketAddress);
 
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            final File localFile = new File( filename );
 
-            BufferedImage image = ImageIO.read(new File("C:\\Users\\juan\\Desktop\\recono\\coche.png"));
-            ImageIO.write(image, "jpg", byteArrayOutputStream);
+            RandomAccessFile afile = new RandomAccessFile(localFile,"r");
+            FileChannel inChannel = afile.getChannel();
+            ByteBuffer buffer = ByteBuffer.allocate(8192);
+            while(inChannel.read(buffer) != -1)
+            {
+                buffer.flip();
+                socketChannel.write(buffer);
+                buffer.clear();
 
-            byte[] size = ByteBuffer.allocate(4).putInt(byteArrayOutputStream.size()).array();
-            System.out.println(byteArrayOutputStream.size());
-            outputStream.write(byteArrayOutputStream.toByteArray());
-            Thread.sleep(2000);
+            }
+            socketChannel.close();
+            afile.close();
 
-            outputStream.close();
-            clientSocket.close();
         }
         catch (Exception e){
             log("error: " + e.toString());
